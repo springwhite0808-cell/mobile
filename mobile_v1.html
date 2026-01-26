@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>公募基金智能调研 - 移动端</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./vue.global.js"></script>
+    <script src="./lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        .slide-up-enter-active, .slide-up-leave-active { transition: transform 0.3s ease-out; }
+        .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
+        /* Hide scrollbar for clean mobile look */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen overflow-hidden select-none">
+    <div id="app" class="flex flex-col h-full relative">
+        
+        <!-- Top Status Bar (Mock) -->
+        <div class="h-12 bg-white/80 backdrop-blur-md flex items-center justify-between px-4 border-b border-slate-100 z-10 shrink-0">
+            <h1 class="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{{ viewTitle }}</h1>
+            <div class="flex gap-3">
+                <button class="p-2 rounded-full active:bg-slate-100 relative">
+                    <i data-lucide="bell" class="w-5 h-5 text-slate-600"></i>
+                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto no-scrollbar pb-24 relative">
+            
+            <!-- Dashboard View -->
+            <div v-if="currentView === 'dashboard'" class="p-4 space-y-4">
+                <!-- Mobile Hero -->
+                <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/30 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                    <h2 class="text-xl font-bold mb-2">早安，研究员</h2>
+                    <p class="text-blue-100 text-xs mb-4">今日有 2 个调研任务待执行</p>
+                    <div class="flex gap-3">
+                        <button @click="switchView('execution')" class="flex-1 bg-white text-blue-600 py-2 rounded-xl text-sm font-bold shadow-sm active:scale-95 transition-transform flex items-center justify-center gap-2">
+                            <i data-lucide="mic" class="w-4 h-4"></i> 开始调研
+                        </button>
+                        <button @click="switchView('requirements')" class="flex-1 bg-white/20 text-white py-2 rounded-xl text-sm font-bold backdrop-blur-md active:scale-95 transition-transform">
+                            查看日程
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div class="text-slate-400 text-xs mb-1">本周覆盖</div>
+                        <div class="text-2xl font-bold text-slate-800">12 <span class="text-xs font-normal text-slate-400">家</span></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div class="text-slate-400 text-xs mb-1">待整理纪要</div>
+                        <div class="text-2xl font-bold text-orange-500">3 <span class="text-xs font-normal text-slate-400">份</span></div>
+                    </div>
+                </div>
+
+                <!-- Recent Requirements -->
+                <div>
+                    <div class="flex justify-between items-center mb-2 px-1">
+                        <h3 class="font-bold text-slate-700">近期需求</h3>
+                        <span class="text-xs text-blue-600" @click="switchView('requirements')">全部</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div v-for="req in requirements.slice(0,3)" :key="req.id" class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors" @click="openReqDetail(req)">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-bold text-slate-800 line-clamp-1">{{ req.title }}</span>
+                                <span :class="statusClass(req.status)">{{ req.status }}</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500">
+                                <i data-lucide="building-2" class="w-3 h-3"></i> {{ req.company }}
+                                <span class="mx-1">·</span>
+                                <span :class="priorityClass(req.priority)">{{ req.priority }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Requirements View -->
+            <div v-if="currentView === 'requirements'" class="p-4 space-y-3 relative h-full flex flex-col">
+                <div class="flex gap-2 mb-2 overflow-x-auto no-scrollbar shrink-0">
+                    <button v-for="filter in ['全部', '待处理', '准备中', '已完成']" 
+                        class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors"
+                        :class="reqFilter === filter ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30' : 'bg-white text-slate-500 border border-slate-200'"
+                        @click="reqFilter = filter">
+                        {{ filter }}
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-20">
+                    <div v-for="req in filteredRequirements" :key="req.id" class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:scale-[0.98] transition-transform" @click="openReqDetail(req)">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-bold text-slate-800 text-sm">{{ req.title }}</h4>
+                            <span :class="statusClass(req.status)">{{ req.status }}</span>
+                        </div>
+                        
+                        <!-- Core Conclusion Display for Completed Items -->
+                        <div v-if="req.status === '已完成' && req.conclusion" class="mb-3 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <i data-lucide="lightbulb" class="w-3 h-3 text-indigo-600 fill-current"></i>
+                                <span class="text-xs font-bold text-indigo-700">核心结论</span>
+                            </div>
+                            <p class="text-xs text-indigo-900 leading-relaxed">{{ req.conclusion }}</p>
+                        </div>
+
+                        <div class="flex items-center justify-between mt-3">
+                            <div class="flex items-center gap-2 text-xs text-slate-500">
+                                <div class="w-6 h-6 rounded bg-slate-100 flex items-center justify-center font-bold text-slate-600">
+                                    {{ req.company[0] }}
+                                </div>
+                                {{ req.company }}
+                            </div>
+                            <button v-if="req.status !== '已完成'" class="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold" @click.stop="startOutlineFromReq(req)">生成提纲</button>
+                            <button v-else class="px-3 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold" @click.stop>查看报告</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Floating Add Button -->
+                <button @click="showNewReqModal = true" class="absolute bottom-6 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-500/40 flex items-center justify-center z-10 active:scale-90 transition-transform">
+                    <i data-lucide="plus" class="w-8 h-8"></i>
+                </button>
+            </div>
+
+            <!-- Execution View (Landing) -->
+            <div v-if="currentView === 'execution'" class="p-4 h-full flex flex-col relative">
+                <div v-if="currentOutline" class="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur rounded-xl p-3 shadow-sm border border-indigo-100 z-10 animate-slide-down">
+                    <div class="flex justify-between items-center mb-1">
+                            <div class="text-xs text-indigo-600 font-bold flex items-center gap-1">
+                            <i data-lucide="file-check" class="w-3 h-3"></i> 已关联提纲
+                            </div>
+                            <button @click="currentOutline = null" class="text-slate-400"><i data-lucide="x" class="w-3 h-3"></i></button>
+                    </div>
+                    <div class="font-bold text-slate-800 text-sm line-clamp-1">{{ currentOutline.title }}</div>
+                    <div class="text-xs text-slate-500 mt-1">{{ currentOutline.questions.length }} 个核心问题待验证</div>
+                </div>
+
+                <div class="flex-1 flex flex-col items-center justify-center text-center space-y-8">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-blue-500/20 rounded-full animate-ping"></div>
+                        <button @click="startRecording" class="relative w-32 h-32 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white active:scale-95 transition-transform">
+                            <i data-lucide="mic" class="w-12 h-12"></i>
+                        </button>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 mb-2">开始调研录音</h2>
+                        <p class="text-slate-400 text-sm max-w-xs mx-auto">系统将实时转写并根据提纲自动提取关键信息</p>
+                    </div>
+                    
+                    <div class="w-full max-w-xs space-y-3">
+                        <button @click="handleSelectOutline" class="w-full py-3 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-sm shadow-sm flex items-center justify-center gap-2 active:bg-slate-50">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> {{ currentOutline ? '更换关联提纲' : '选择关联提纲' }}
+                        </button>
+                        <button class="w-full py-3 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-sm shadow-sm flex items-center justify-center gap-2 active:bg-slate-50">
+                            <i data-lucide="clock" class="w-4 h-4"></i> 查看近期记录
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Company View -->
+            <div v-if="currentView === 'company'" class="flex flex-col h-full">
+                <!-- Search Bar -->
+                <div class="p-4 bg-white border-b border-slate-100 sticky top-0 z-10">
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                        <input type="text" placeholder="搜索公司/代码/行业" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                </div>
+                <!-- Company List & QA -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                    <!-- Smart QA Section (Moved here) -->
+                    <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-4 border border-indigo-100 mb-4">
+                        <h3 class="font-bold text-indigo-900 mb-3 flex items-center gap-2">
+                            <i data-lucide="bot" class="w-5 h-5 text-indigo-600"></i>
+                            AI 智能问答
+                        </h3>
+                        <div id="qa-container" class="h-48 overflow-y-auto mb-3 space-y-3 pr-1">
+                            <div v-for="(msg, idx) in qaMessages" :key="idx" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
+                                <div :class="['max-w-[85%] rounded-xl p-3 text-xs leading-relaxed', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 shadow-sm rounded-tl-none']">
+                                    <div class="whitespace-pre-wrap">{{ msg.content }}</div>
+                                </div>
+                            </div>
+                            <div v-if="isQaLoading" class="flex justify-start">
+                                 <div class="bg-white text-slate-500 shadow-sm rounded-xl rounded-tl-none p-3 text-xs flex items-center gap-2">
+                                    <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
+                                    <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-100"></div>
+                                    <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-200"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <input v-model="qaInput" @keyup.enter="askAI" type="text" placeholder="输入问题，AI 帮您分析..." class="flex-1 bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500">
+                            <button @click="askAI" class="bg-indigo-600 text-white rounded-xl px-3 py-2 active:scale-95 transition-transform">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-for="company in companies" :key="company.code" @click="openCompanyDetail(company)" class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
+                            {{ company.name[0] }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start mb-1">
+                                <h4 class="font-bold text-slate-800 truncate">{{ company.name }}</h4>
+                                <span class="text-xs font-mono text-slate-400">{{ company.code }}</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500">
+                                <span class="bg-slate-100 px-1.5 py-0.5 rounded">{{ company.industry }}</span>
+                                <span>PE: {{ company.pe }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outline View (Previously Outcomes) -->
+            <div v-if="currentView === 'outcomes'" class="p-4 space-y-4">
+                <!-- Header / Actions -->
+                <div class="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg shadow-indigo-500/30 relative">
+                     <button @click="switchView('dashboard')" class="absolute top-4 right-4 p-2 bg-white/20 backdrop-blur rounded-full hover:bg-white/30 transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4 text-white"></i>
+                    </button>
+                    <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-5 h-5"></i> 智能提纲助手
+                    </h2>
+                    <p class="text-indigo-100 text-xs mb-4">AI 辅助生成，提升调研效率</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="startOutline('ai')" class="bg-white text-indigo-600 py-2.5 rounded-xl text-sm font-bold shadow-sm active:scale-95 transition-transform flex items-center justify-center gap-2">
+                            <i data-lucide="bot" class="w-4 h-4"></i> AI 一键生成
+                        </button>
+                        <button @click="startOutline('template')" class="bg-white/20 text-white py-2.5 rounded-xl text-sm font-bold backdrop-blur-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                            <i data-lucide="layout-template" class="w-4 h-4"></i> 使用模板
+                        </button>
+                        <button @click="startOutline('history')" class="bg-white/20 text-white py-2.5 rounded-xl text-sm font-bold backdrop-blur-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                            <i data-lucide="history" class="w-4 h-4"></i> 引用历史
+                        </button>
+                         <button @click="startOutline('blank')" class="bg-white/20 text-white py-2.5 rounded-xl text-sm font-bold backdrop-blur-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                            <i data-lucide="file-plus" class="w-4 h-4"></i> 新建空白
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Outlines List -->
+                <div>
+                    <h3 class="font-bold text-slate-700 mb-3 px-1">我的提纲</h3>
+                    <div class="space-y-3">
+                        <div v-for="outline in recentOutlines" :key="outline.id" class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-slate-800 text-sm">{{ outline.title }}</h4>
+                                <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500">{{ outline.type }}</span>
+                            </div>
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="text-xs text-slate-400">{{ outline.date }}</span>
+                                <div class="flex gap-2">
+                                    <button class="text-xs font-bold text-blue-600 px-2 py-1 bg-blue-50 rounded-lg">编辑</button>
+                                    <button class="text-xs font-bold text-slate-600 px-2 py-1 bg-slate-100 rounded-lg">使用</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bg-white border-t border-slate-200 h-16 fixed bottom-0 w-full flex justify-around items-center px-2 pb-safe z-50">
+            <button @click="switchView('dashboard')" :class="['flex flex-col items-center gap-1 w-14 transition-colors', currentView === 'dashboard' ? 'text-blue-600' : 'text-slate-400']">
+                <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium">工作台</span>
+            </button>
+            <button @click="switchView('requirements')" :class="['flex flex-col items-center gap-1 w-14 transition-colors', currentView === 'requirements' ? 'text-blue-600' : 'text-slate-400']">
+                <i data-lucide="list-todo" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium">需求</span>
+            </button>
+            
+            <!-- Center Action Button -->
+            <button @click="switchView('execution')" class="flex flex-col items-center justify-center -mt-6">
+                <div class="w-14 h-14 rounded-full bg-blue-600 shadow-lg shadow-blue-500/40 flex items-center justify-center text-white active:scale-95 transition-transform">
+                    <i data-lucide="mic" class="w-7 h-7"></i>
+                </div>
+                <span class="text-[10px] font-medium text-slate-500 mt-1">调研</span>
+            </button>
+
+            <button @click="switchView('company')" :class="['flex flex-col items-center gap-1 w-14 transition-colors', currentView === 'company' ? 'text-blue-600' : 'text-slate-400']">
+                <i data-lucide="building-2" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium">公司</span>
+            </button>
+            <button @click="switchView('outcomes')" :class="['flex flex-col items-center gap-1 w-14 transition-colors', currentView === 'outcomes' ? 'text-blue-600' : 'text-slate-400']">
+                <i data-lucide="sparkles" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium">提纲</span>
+            </button>
+        </nav>
+
+        <!-- Modals / Full Screen Overlays -->
+
+        <!-- Outline Editor Modal (Full Screen) -->
+        <div v-if="showOutlineModal" class="fixed inset-0 bg-slate-50 z-[150] flex flex-col animate-slide-up">
+            <!-- Header -->
+            <div class="px-4 py-3 bg-white border-b border-slate-100 flex justify-between items-center shadow-sm z-10 pt-safe">
+                <div class="flex items-center gap-3">
+                    <button @click="showOutlineModal = false" class="p-2 -ml-2 text-slate-500 active:bg-slate-100 rounded-full"><i data-lucide="x" class="w-6 h-6"></i></button>
+                    <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-indigo-500"></i>
+                        智能提纲
+                    </h3>
+                </div>
+                <button v-if="!isGeneratingOutline" @click="saveOutlineDraft" class="text-blue-600 font-bold text-sm">保存草稿</button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto relative">
+                <!-- Loading State -->
+                <div v-if="isGeneratingOutline" class="absolute inset-0 flex flex-col items-center justify-center bg-white z-20">
+                    <div class="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
+                    <h4 class="text-xl font-bold text-slate-800 mb-2">AI 正在深度思考</h4>
+                    <p class="text-slate-500 text-sm px-8 text-center leading-relaxed">正在分析 {{ selectedReq?.company }} 的历史调研记录与行业动态...</p>
+                </div>
+
+                <!-- Editor State -->
+                <div v-else class="p-4 space-y-4 pb-24">
+                    <!-- Context Card -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div class="mb-3">
+                            <label class="block text-xs font-bold text-slate-400 mb-1">调研主题</label>
+                            <input v-model="outlineTitle" class="w-full font-bold text-slate-800 text-base border-b border-dashed border-slate-300 pb-1 focus:outline-none focus:border-blue-500 bg-transparent" />
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                                    {{ selectedReq?.company?.[0] }}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-sm text-slate-700">{{ selectedReq?.company }}</div>
+                                    <div class="text-[10px] text-slate-400">关联需求: {{ selectedReq?.title }}</div>
+                                </div>
+                            </div>
+                            <select v-model="selectedTemplate" @change="applyTemplate" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 font-medium outline-none">
+                                <option value="custom">自定义</option>
+                                <option value="financial">财务分析</option>
+                                <option value="strategy">战略规划</option>
+                                <option value="product">产品调研</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Questions List -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center px-1">
+                            <h4 class="font-bold text-slate-700 text-sm">核心问题列表</h4>
+                            <span class="text-xs text-slate-400">{{ generatedOutline.length }} 个问题</span>
+                        </div>
+                        
+                        <transition-group name="list" tag="div" class="space-y-3">
+                            <div v-for="(q, idx) in generatedOutline" :key="idx" class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm group focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="flex gap-2">
+                                        <span class="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-bold">P{{ idx }}</span>
+                                        <span class="bg-slate-50 text-slate-500 px-2 py-0.5 rounded text-[10px]">类别: {{ q.category || '综合' }}</span>
+                                    </div>
+                                    <button @click="removeQuestion(idx)" class="text-slate-300 hover:text-red-500 p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                </div>
+                                <textarea v-model="q.content" rows="3" class="w-full text-sm text-slate-700 leading-relaxed bg-transparent border-0 p-0 focus:ring-0 resize-none placeholder-slate-300" placeholder="请输入问题内容..."></textarea>
+                            </div>
+                        </transition-group>
+
+                        <button @click="addQuestion" class="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-blue-300 hover:text-blue-500 transition-all">
+                            <i data-lucide="plus" class="w-4 h-4"></i> 添加问题
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action Bar -->
+            <div v-if="!isGeneratingOutline" class="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-10 flex gap-3 pb-safe">
+                <button @click="regenerateOutline" class="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-xl font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> 重新生成
+                </button>
+                <button @click="useOutline" class="flex-[2] py-3.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 active:scale-95 transition-transform flex items-center justify-center gap-2">
+                    <i data-lucide="mic" class="w-4 h-4"></i> 开始调研
+                </button>
+            </div>
+        </div>
+
+        <!-- Recording Overlay -->
+        <transition name="slide-up">
+            <div v-if="isRecording" class="fixed inset-0 bg-slate-900 z-[100] flex flex-col text-white">
+                <div class="p-6 flex justify-between items-center">
+                    <button @click="minimizeRecording" class="p-2 bg-white/10 rounded-full"><i data-lucide="chevron-down" class="w-6 h-6"></i></button>
+                    <div class="text-sm font-mono text-red-400 flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                        REC {{ formatTime(recordingSeconds) }}
+                    </div>
+                    <button class="p-2 bg-white/10 rounded-full"><i data-lucide="more-horizontal" class="w-6 h-6"></i></button>
+                </div>
+                
+                <div class="flex-1 flex flex-col items-center justify-center relative">
+                    <!-- Waveform Visualization -->
+                    <div class="flex items-center gap-1 h-32 mb-8">
+                        <div v-for="i in 20" :key="i" class="w-1.5 bg-blue-500 rounded-full animate-pulse" 
+                             :style="{ height: Math.random() * 100 + '%', animationDuration: Math.random() * 0.5 + 0.5 + 's' }"></div>
+                    </div>
+                    
+                    <h2 class="text-2xl font-bold mb-2">正在调研：比亚迪</h2>
+                    <p class="text-slate-400 text-sm">已自动关联提纲 (3 个核心问题)</p>
+                </div>
+
+                <!-- Real-time Transcription Preview -->
+                <div class="h-1/3 bg-slate-800/50 backdrop-blur-md rounded-t-3xl p-6 overflow-y-auto">
+                    <div class="space-y-4 text-sm">
+                        <div class="text-slate-400">00:15 研究员</div>
+                        <div class="text-white">请问目前仰望U8的交付周期大概是多久？订单排产情况如何？</div>
+                        <div class="text-slate-400">00:22 管理层</div>
+                        <div class="text-white">目前仰望U8的订单非常火爆，我们的交付周期大约在3-4个月左右。现在的月产能已经爬坡到了3000台。</div>
+                    </div>
+                </div>
+
+                <div class="p-8 pb-12 flex items-center justify-center gap-8">
+                    <button @click="togglePause" class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
+                        <i :data-lucide="isPaused ? 'play' : 'pause'" class="w-6 h-6"></i>
+                    </button>
+                    <button @click="stopRecording" class="w-20 h-20 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/40"><i data-lucide="square" class="w-8 h-8 fill-white"></i></button>
+                    <button class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center"><i data-lucide="flag" class="w-6 h-6"></i></button>
+                </div>
+            </div>
+        </transition>
+
+        <!-- New Requirement Modal -->
+        <div v-if="showNewReqModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center sm:p-4">
+            <div class="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 animate-slide-up">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-slate-800 text-lg">新建调研需求</h3>
+                    <button @click="showNewReqModal = false" class="p-2 bg-slate-100 rounded-full text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1">需求标题</label>
+                        <input v-model="newReqForm.title" type="text" placeholder="例如：比亚迪新车型调研" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1">关联公司</label>
+                        <input v-model="newReqForm.company" type="text" placeholder="输入公司名称" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1">优先级</label>
+                            <select v-model="newReqForm.priority" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500">
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1">状态</label>
+                            <select v-model="newReqForm.status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500">
+                                <option value="待处理">待处理</option>
+                                <option value="准备中">准备中</option>
+                                <option value="已完成">已完成</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button @click="addNewRequirement" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl mt-4 shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-transform">
+                        创建需求
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Company Detail Modal -->
+        <div v-if="showCompanyDetail" class="fixed inset-0 bg-white z-[200] flex flex-col animate-slide-up">
+            <div class="h-48 bg-gradient-to-br from-blue-600 to-indigo-700 relative shrink-0">
+                <button @click="showCompanyDetail = false" class="absolute top-4 left-4 p-2 bg-white/20 backdrop-blur rounded-full text-white z-10">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <div class="absolute bottom-6 left-6 text-white">
+                    <div class="flex items-center gap-2 mb-1 opacity-80">
+                        <span class="text-sm font-mono">{{ selectedCompany?.code }}</span>
+                        <span class="px-2 py-0.5 bg-white/20 rounded text-xs backdrop-blur">{{ selectedCompany?.industry }}</span>
+                    </div>
+                    <h2 class="text-2xl font-bold">{{ selectedCompany?.name }}</h2>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-slate-50 p-3 rounded-xl text-center">
+                        <div class="text-xs text-slate-500 mb-1">市盈率</div>
+                        <div class="font-bold text-slate-800">{{ selectedCompany?.pe }}</div>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl text-center">
+                        <div class="text-xs text-slate-500 mb-1">总市值</div>
+                        <div class="font-bold text-slate-800">1.2万亿</div>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl text-center">
+                        <div class="text-xs text-slate-500 mb-1">研报</div>
+                        <div class="font-bold text-blue-600">128</div>
+                    </div>
+                </div>
+                
+                <!-- Company History Section -->
+                <div>
+                    <h3 class="font-bold text-slate-800 mb-3 flex items-center justify-between">
+                        <span>调研历史</span>
+                        <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">{{ companyHistory.length }} 条记录</span>
+                    </h3>
+                    <div class="space-y-3">
+                        <div v-for="record in companyHistory" :key="record.id" class="p-4 border border-slate-100 rounded-xl shadow-sm bg-white active:bg-slate-50 transition-colors">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-sm text-slate-800 line-clamp-1">{{ record.title }}</h4>
+                                <span class="text-xs text-slate-400 shrink-0">{{ record.date }}</span>
+                            </div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[10px] font-medium">{{ record.type || '调研' }}</span>
+                                <span class="text-[10px] text-slate-500">{{ record.researcher }}</span>
+                            </div>
+                            <p class="text-xs text-slate-500 line-clamp-2 leading-relaxed">{{ record.summary }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Marginal Changes Section -->
+                <div>
+                    <h3 class="font-bold text-slate-800 mb-3">边际变化追踪</h3>
+                    <div class="space-y-3">
+                         <div v-for="(change, idx) in marginalChanges" :key="idx" class="p-3 bg-white border border-slate-100 rounded-xl shadow-sm flex items-center justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-bold text-slate-700 text-sm">{{ change.title }}</span>
+                                    <span v-if="change.status === 'improvement'" class="px-1.5 py-0.5 bg-green-50 text-green-600 rounded text-[10px] font-bold">利好</span>
+                                    <span v-else-if="change.status === 'risk'" class="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[10px] font-bold">风险</span>
+                                    <span v-else class="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">中性</span>
+                                </div>
+                                <div class="text-xs text-slate-500">{{ change.desc }}</div>
+                            </div>
+                            <div class="text-xs font-bold" :class="{'text-green-600': change.status === 'improvement', 'text-red-600': change.status === 'risk', 'text-slate-400': change.status === 'stable'}">
+                                {{ change.impact }}
+                            </div>
+                         </div>
+                    </div>
+                </div>
+
+                <!-- Smart QA Section -->
+                <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-4 border border-indigo-100">
+                    <h3 class="font-bold text-indigo-900 mb-3 flex items-center gap-2">
+                        <i data-lucide="bot" class="w-5 h-5 text-indigo-600"></i>
+                        AI 智能问答
+                    </h3>
+                    <div id="qa-container" class="h-48 overflow-y-auto mb-3 space-y-3 pr-1">
+                        <div v-for="(msg, idx) in qaMessages" :key="idx" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
+                            <div :class="['max-w-[85%] rounded-xl p-3 text-xs leading-relaxed', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 shadow-sm rounded-tl-none']">
+                                <div class="whitespace-pre-wrap">{{ msg.content }}</div>
+                            </div>
+                        </div>
+                        <div v-if="isQaLoading" class="flex justify-start">
+                             <div class="bg-white text-slate-500 shadow-sm rounded-xl rounded-tl-none p-3 text-xs flex items-center gap-2">
+                                <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
+                                <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-100"></div>
+                                <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-200"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <input v-model="qaInput" @keyup.enter="askAI" type="text" placeholder="输入问题，AI 帮您分析..." class="flex-1 bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500">
+                        <button @click="askAI" class="bg-indigo-600 text-white rounded-xl px-3 py-2 active:scale-95 transition-transform">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-slate-800 mb-3">相关研报</h3>
+                    <div class="space-y-3">
+                        <div class="p-4 border border-slate-100 rounded-xl shadow-sm bg-white">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-sm text-slate-800">2024Q4 业绩说明会</h4>
+                                <span class="text-xs text-slate-400">2025-01-15</span>
+                            </div>
+                            <p class="text-xs text-slate-500 line-clamp-2">管理层对2025年销量目标保持乐观，预计出口占比将提升至20%以上。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 border-t border-slate-100">
+                <button class="w-full py-3 bg-blue-50 text-blue-600 font-bold rounded-xl" @click="showCompanyDetail = false; switchView('requirements'); reqFilter='全部'; newReqForm.company = selectedCompany.name; showNewReqModal = true;">
+                    新建相关需求
+                </button>
+            </div>
+        </div>
+
+        <!-- Mini Player -->
+        <div v-if="showMiniPlayer" class="fixed bottom-20 left-4 right-4 bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-2xl shadow-xl z-[90] flex items-center justify-between animate-slide-up" @click="isRecording = true; showMiniPlayer = false">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                    <i data-lucide="mic" class="w-5 h-5 animate-pulse"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-bold">正在录音...</div>
+                    <div class="text-xs text-slate-400 font-mono">{{ formatTime(recordingSeconds) }}</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                 <button @click.stop class="p-2 rounded-full hover:bg-white/10 text-yellow-400">
+                    <i data-lucide="flag" class="w-5 h-5"></i>
+                </button>
+                <button @click.stop="togglePause" class="p-2 rounded-full hover:bg-white/10">
+                    <i :data-lucide="isPaused ? 'play' : 'pause'" class="w-5 h-5"></i>
+                </button>
+                <button @click.stop="stopRecording" class="p-2 rounded-full hover:bg-white/10 text-red-400">
+                    <i data-lucide="square" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Share Poster Modal (Mobile Optimized) -->
+        <div v-if="showShareModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex flex-col justify-end">
+            <div class="bg-slate-100 rounded-t-3xl overflow-hidden p-4 pb-8 animate-slide-up">
+                <div class="flex justify-between items-center mb-4 px-2">
+                    <h3 class="font-bold text-slate-700">分享纪要</h3>
+                    <button @click="showShareModal = false" class="p-2 bg-slate-200 rounded-full"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+                
+                <!-- Poster Preview -->
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-6 mx-4 transform scale-95 origin-bottom">
+                    <div class="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 text-white text-center">
+                        <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center mx-auto mb-3 text-xl font-bold border border-white/30">
+                            {{ shareData.logo }}
+                        </div>
+                        <h2 class="text-lg font-bold">{{ shareData.company }}</h2>
+                        <p class="text-blue-100 text-xs font-mono">{{ shareData.code }}</p>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-slate-800 mb-2 text-center">{{ shareData.title }}</h3>
+                        <div class="text-xs text-slate-500 text-center mb-4">{{ shareData.date }} · {{ shareData.researcher }}</div>
+                        <div class="bg-slate-50 p-3 rounded-xl text-xs text-slate-600 leading-relaxed mb-4 border border-slate-100 relative">
+                             <i data-lucide="quote" class="w-4 h-4 text-slate-300 absolute -top-2 -left-2 fill-slate-200"></i>
+                             {{ shareData.summary }}
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="w-20 h-20 bg-slate-900 rounded-lg flex items-center justify-center text-white">
+                                <i data-lucide="qr-code" class="w-10 h-10"></i>
+                            </div>
+                            <p class="text-[8px] text-slate-400 uppercase font-bold tracking-widest">长按识别</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 px-4">
+                    <button class="py-3 bg-white text-slate-700 font-bold rounded-xl shadow-sm">保存图片</button>
+                    <button class="py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30">发送给好友</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const currentView = ref('dashboard');
+                const viewTitle = computed(() => {
+                    const map = {
+                        'dashboard': '工作台',
+                        'requirements': '调研需求',
+                        'execution': '调研执行',
+                        'company': '公司库',
+                        'outline': '智能提纲'
+                    };
+                    return map[currentView.value];
+                });
+
+                const isRecording = ref(false);
+                const isPaused = ref(false);
+                const recordingSeconds = ref(0);
+                const recordingInterval = ref(null);
+                const showMiniPlayer = ref(false);
+                
+                const showShareModal = ref(false);
+                const shareData = ref({});
+                const reqFilter = ref('全部');
+                
+                const showOutlineModal = ref(false);
+                const isGeneratingOutline = ref(false);
+                const selectedReq = ref(null);
+                const generatedOutline = ref([]);
+                const currentOutline = ref(null);
+
+                const showNewReqModal = ref(false);
+                const newReqForm = ref({ title: '', company: '', priority: 'Medium', status: '待处理' });
+                
+                const showCompanyDetail = ref(false);
+                const selectedCompany = ref(null);
+                
+                // Outline Logic
+                const selectedTemplate = ref('custom');
+                const startOutline = (type) => {
+                    showOutlineModal.value = true;
+                    if (type === 'ai') {
+                        isGeneratingOutline.value = true;
+                        setTimeout(() => {
+                            isGeneratingOutline.value = false;
+                            generatedOutline.value = [
+                                { category: '综合', content: '（AI生成）公司目前的主要营收来源是什么？' },
+                                { category: '战略', content: '（AI生成）未来3年的增长预期如何？' },
+                                { category: '竞争', content: '（AI生成）核心竞争优势有哪些？' }
+                            ];
+                        }, 1500);
+                    } else if (type === 'template') {
+                        selectedTemplate.value = 'financial';
+                        applyTemplate();
+                    } else if (type === 'history') {
+                        generatedOutline.value = [
+                            { category: '历史引用', content: '（引用2024Q4）上次提到的产能扩建进度如何？' },
+                            { category: '历史引用', content: '（引用2024Q4）库存水位是否恢复正常？' }
+                        ];
+                    } else if (type === 'blank') {
+                        generatedOutline.value = [
+                            { category: '自定义', content: '' }
+                        ];
+                    }
+                };
+
+                const applyTemplate = () => {
+                    if (selectedTemplate.value === 'financial') {
+                        generatedOutline.value = [
+                            { category: '财务', content: '营收与净利润的同比增速及驱动因素？' },
+                            { category: '财务', content: '毛利率与净利率的变化趋势及原因？' },
+                            { category: '财务', content: '经营性现金流情况如何？' }
+                        ];
+                    } else if (selectedTemplate.value === 'strategy') {
+                         generatedOutline.value = [
+                            { category: '战略', content: '公司未来3-5年的核心战略规划是什么？' },
+                            { category: '战略', content: '在海外市场的布局与进展？' },
+                            { category: '战略', content: '新业务的拓展情况与预期贡献？' }
+                        ];
+                    } else if (selectedTemplate.value === 'product') {
+                         generatedOutline.value = [
+                            { category: '产品', content: '核心产品的销量与市占率情况？' },
+                            { category: '产品', content: '新产品的研发进度与上市计划？' },
+                            { category: '产品', content: '产品定价策略与毛利水平？' }
+                        ];
+                    }
+                };
+                
+                const regenerateOutline = () => {
+                    isGeneratingOutline.value = true;
+                    setTimeout(() => {
+                        isGeneratingOutline.value = false;
+                        // Shuffle/Modify slightly
+                        generatedOutline.value.forEach(q => q.content = '(重新生成) ' + q.content.replace('(AI生成) ', '').replace('(重新生成) ', ''));
+                    }, 1000);
+                };
+
+                const addQuestion = () => {
+                    generatedOutline.value.push({ category: '自定义', content: '' });
+                };
+
+                const removeQuestion = (idx) => {
+                    generatedOutline.value.splice(idx, 1);
+                };
+
+                // Mock Data
+                const requirements = ref([
+                    { id: 'REQ001', title: '比亚迪新车型调研', company: '比亚迪', priority: 'High', status: '准备中', source: '晨会' },
+                    { id: 'REQ002', title: '宁德时代电池技术', company: '宁德时代', priority: 'Medium', status: '待处理', source: '基金经理' },
+                    { 
+                        id: 'REQ003', 
+                        title: '隆基绿能光伏组件', 
+                        company: '隆基绿能', 
+                        priority: 'High', 
+                        status: '已完成', 
+                        source: '个人关注',
+                        conclusion: '组件价格战短期难解，但公司BC电池技术溢价逐渐体现，Q2有望迎来盈利拐点。'
+                    },
+                ]);
+
+                const filteredRequirements = computed(() => {
+                    if (reqFilter.value === '全部') return requirements.value;
+                    return requirements.value.filter(r => r.status === reqFilter.value);
+                });
+
+                const companies = ref([
+                    { name: '比亚迪', code: '002594', industry: '新能源汽车', pe: '25.3' },
+                    { name: '宁德时代', code: '300750', industry: '电池', pe: '18.2' },
+                    { name: '贵州茅台', code: '600519', industry: '白酒', pe: '25.5' },
+                    { name: '迈瑞医疗', code: '300760', industry: '医疗器械', pe: '30.2' },
+                ]);
+
+                const companyHistory = ref([
+                    { id: 1, title: '比亚迪2025Q1业绩交流', date: '2025-04-15', researcher: '我', summary: '业绩超预期，海外市场毛利率显著提升，高端车型占比持续扩大。' },
+                    { id: 2, title: '宁德时代新技术发布会', date: '2025-03-20', researcher: '我', summary: '发布凝聚态电池，能量密度突破500Wh/kg，预计年内量产。' }
+                ]);
+
+                const marginalChanges = ref([
+                    { title: '原材料成本', status: 'improvement', desc: '碳酸锂价格下跌20%', impact: '毛利提升' },
+                    { title: '产能利用率', status: 'stable', desc: '维持在85%左右', impact: '中性' },
+                    { title: '海外政策', status: 'risk', desc: '欧盟反补贴调查', impact: '潜在风险' }
+                ]);
+
+                const qaInput = ref('');
+                const qaMessages = ref([
+                    { role: 'assistant', content: '我是您的AI投资助手，您可以问我关于公司的任何问题，例如：\n1. 公司的核心护城河是什么？\n2. 最近一次财报的亮点有哪些？' }
+                ]);
+                const isQaLoading = ref(false);
+
+                const askAI = () => {
+                    if (!qaInput.value.trim()) return;
+                    const userMsg = qaInput.value;
+                    qaMessages.value.push({ role: 'user', content: userMsg });
+                    qaInput.value = '';
+                    isQaLoading.value = true;
+
+                    // Simulate AI Response
+                    setTimeout(() => {
+                        isQaLoading.value = false;
+                        let reply = 'AI 正在分析...';
+                        if (userMsg.includes('营收') || userMsg.includes('收入')) {
+                            reply = '根据最新财报，公司2024年营收同比增长25%，主要得益于海外市场的强劲表现。';
+                        } else if (userMsg.includes('利润')) {
+                            reply = '净利润同比增长30%，毛利率提升至22%。';
+                        } else {
+                            reply = '这是一个很好的问题。从目前的数据来看，公司的基本面保持稳健，特别是在新能源领域的技术积累正在逐步兑现为业绩。';
+                        }
+                        qaMessages.value.push({ role: 'assistant', content: reply });
+                        nextTick(() => {
+                             const container = document.getElementById('qa-container');
+                             if(container) container.scrollTop = container.scrollHeight;
+                        });
+                    }, 1500);
+                };
+
+            // Chart Rendering Helper (Ported from PC)
+            const renderChart = (elementId, chartData) => {
+                const chartDom = document.getElementById(elementId);
+                if (!chartDom) return;
+                const myChart = echarts.init(chartDom);
+                
+                const option = {
+                    title: { text: chartData.title, left: 'center', textStyle: { fontSize: 12 } },
+                    tooltip: { trigger: 'axis' },
+                    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                    xAxis: { type: 'category', data: chartData.categories, boundaryGap: chartData.chartType === 'bar', axisLabel: { fontSize: 10 } },
+                    yAxis: { type: 'value', axisLabel: { fontSize: 10 } },
+                    series: chartData.series.map(s => ({
+                        name: s.name,
+                        type: chartData.chartType || 'line',
+                        data: s.data,
+                        smooth: true,
+                        itemStyle: { color: '#3b82f6' },
+                        areaStyle: chartData.chartType === 'line' ? {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: 'rgba(59,130,246,0.3)' },
+                                { offset: 1, color: 'rgba(59,130,246,0.01)' }
+                            ])
+                        } : undefined
+                    }))
+                };
+                
+                if (chartData.chartType === 'pie') {
+                     option.xAxis = undefined;
+                     option.yAxis = undefined;
+                     option.tooltip = { trigger: 'item' };
+                     option.series = [{
+                         name: chartData.title,
+                         type: 'pie',
+                         radius: ['40%', '70%'],
+                         avoidLabelOverlap: false,
+                         itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+                         label: { show: false, position: 'center' },
+                         emphasis: { label: { show: true, fontSize: 12, fontWeight: 'bold' } },
+                         data: chartData.series[0].data 
+                     }];
+                }
+
+                myChart.setOption(option);
+            };
+
+
+
+            // Actions
+            const switchView = (view) => {
+                    currentView.value = view;
+                    nextTick(() => lucide.createIcons());
+                };
+                
+                const addNewRequirement = () => {
+                    if (!newReqForm.value.title || !newReqForm.value.company) {
+                        alert('请填写完整信息');
+                        return;
+                    }
+                    requirements.value.unshift({
+                        id: 'REQ' + Date.now(),
+                        ...newReqForm.value
+                    });
+                    showNewReqModal.value = false;
+                    newReqForm.value = { title: '', company: '', priority: 'Medium', status: '待处理' };
+                    reqFilter.value = '全部'; // Reset filter to show new item
+                };
+                
+                const openReqDetail = (req) => {
+                    // Placeholder for requirement detail
+                    alert('查看需求详情: ' + req.title);
+                };
+
+                const openCompanyDetail = (company) => {
+                    selectedCompany.value = company;
+                    showCompanyDetail.value = true;
+                };
+
+                const startOutlineFromReq = (req) => {
+                    selectedReq.value = req;
+                    showOutlineModal.value = true;
+                    isGeneratingOutline.value = true;
+                    // Simulate AI generation
+                    setTimeout(() => {
+                        isGeneratingOutline.value = false;
+                        generatedOutline.value = [
+                            '请问公司在' + req.company + '海外市场的具体布局与渠道建设进展如何？',
+                            '面对原材料价格波动，公司采取了哪些具体的成本控制与对冲策略？',
+                            '对于未来3-5年的行业竞争格局，管理层如何预判？公司的核心壁垒在哪里？'
+                        ];
+                        nextTick(() => lucide.createIcons());
+                    }, 2000);
+                };
+
+                const useOutline = () => {
+                    currentOutline.value = {
+                        title: selectedReq.value.title,
+                        questions: generatedOutline.value
+                    };
+                    showOutlineModal.value = false;
+                    switchView('execution');
+                };
+
+                const handleSelectOutline = () => {
+                    if (currentOutline.value) {
+                         if(confirm('是否重新生成提纲？')) {
+                             switchView('requirements');
+                         }
+                    } else {
+                        alert('请先在需求列表中选择一个需求生成提纲');
+                        switchView('requirements');
+                    }
+                };
+
+                const startRecording = () => {
+                    isRecording.value = true;
+                    isPaused.value = false;
+                    showMiniPlayer.value = false;
+                    if (recordingInterval.value) clearInterval(recordingInterval.value);
+                    recordingSeconds.value = 0;
+                    recordingInterval.value = setInterval(() => {
+                        recordingSeconds.value++;
+                    }, 1000);
+                };
+                
+                const togglePause = () => {
+                    isPaused.value = !isPaused.value;
+                    if (isPaused.value) {
+                        clearInterval(recordingInterval.value);
+                    } else {
+                        recordingInterval.value = setInterval(() => {
+                            recordingSeconds.value++;
+                        }, 1000);
+                    }
+                };
+
+                const stopRecording = () => {
+                    isRecording.value = false;
+                    showMiniPlayer.value = false;
+                    clearInterval(recordingInterval.value);
+                    
+                    // Create Research Record
+                    const now = new Date();
+                    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                    
+                    const newRecord = {
+                        id: Date.now(),
+                        title: selectedReq.value ? selectedReq.value.title : '现场临时调研',
+                        date: dateStr,
+                        researcher: '我',
+                        summary: '（移动端自动归档）本次调研已完成录音转写。核心结论：管理层对未来增长保持乐观，产能扩张按计划进行。',
+                        type: '现场调研'
+                    };
+
+                    // Add to Company History
+                    companyHistory.value.unshift(newRecord);
+
+                    // Update Requirement Status OR Create New Requirement
+                    if (selectedReq.value) {
+                        const req = requirements.value.find(r => r.id === selectedReq.value.id);
+                        if (req) {
+                            req.status = '已完成';
+                            req.conclusion = newRecord.summary;
+                        }
+                    } else {
+                        // Create a new requirement for this ad-hoc research
+                        const newReq = {
+                            id: 'REQ' + Date.now(),
+                            title: newRecord.title,
+                            company: '未关联公司', 
+                            priority: 'Medium',
+                            status: '已完成',
+                            source: '现场调研',
+                            conclusion: newRecord.summary
+                        };
+                        requirements.value.unshift(newReq);
+                    }
+
+                    alert('调研已结束！录音及纪要已自动归档至公司库，需求状态已更新。');
+                    
+                    // Navigate to Requirements to show the result
+                    switchView('requirements');
+                    reqFilter.value = '已完成';
+                };
+
+                const minimizeRecording = () => {
+                    isRecording.value = false;
+                    showMiniPlayer.value = true;
+                };
+
+                const shareRecord = (record) => {
+                    shareData.value = {
+                        ...record,
+                        company: '比亚迪', // Mock
+                        code: '002594',
+                        logo: '比'
+                    };
+                    showShareModal.value = true;
+                };
+
+                const statusClass = (s) => {
+                    const map = {
+                        '待处理': 'text-slate-400 bg-slate-100 px-2 py-0.5 rounded text-[10px]',
+                        '准备中': 'text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-[10px] font-medium',
+                        '已完成': 'text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] font-medium',
+                    };
+                    return map[s] || '';
+                };
+
+                const priorityClass = (p) => {
+                     const map = {
+                        'High': 'text-red-500',
+                        'Medium': 'text-orange-500',
+                        'Low': 'text-green-500',
+                    };
+                    return map[p] || '';
+                };
+
+                const formatTime = (seconds) => {
+                    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+                    const s = (seconds % 60).toString().padStart(2, '0');
+                    return `${m}:${s}`;
+                };
+
+                onMounted(() => {
+                    lucide.createIcons();
+                });
+
+                return {
+                    currentView,
+                    viewTitle,
+                    requirements,
+                    filteredRequirements,
+                    companies,
+                    companyHistory,
+                    isRecording,
+                    isPaused,
+                    showMiniPlayer,
+                    recordingSeconds,
+                    showShareModal,
+                    shareData,
+                    reqFilter,
+                    showOutlineModal,
+                    isGeneratingOutline,
+                    selectedReq,
+                    generatedOutline,
+                    currentOutline,
+                    showNewReqModal,
+                    newReqForm,
+                    showCompanyDetail,
+                    selectedCompany,
+                    selectedTemplate,
+                    startOutline,
+                    applyTemplate,
+                    regenerateOutline,
+                    addQuestion,
+                    removeQuestion,
+                    addNewRequirement,
+                    openReqDetail,
+                    openCompanyDetail,
+                    startOutlineFromReq,
+                    useOutline,
+                    handleSelectOutline,
+                    switchView,
+                    startRecording,
+                    togglePause,
+                    stopRecording,
+                    minimizeRecording,
+                    shareRecord,
+                    statusClass,
+                    priorityClass,
+                    formatTime,
+                    marginalChanges,
+                    qaInput,
+                    qaMessages,
+                    isQaLoading,
+                    askAI
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
