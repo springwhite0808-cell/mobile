@@ -14,6 +14,14 @@
         .fade-enter-from, .fade-leave-to { opacity: 0; }
         .slide-up-enter-active, .slide-up-leave-active { transition: transform 0.3s ease-out; }
         .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow { animation: spin 10s linear infinite; }
+        .animate-spin-reverse-slow { animation: spin 12s linear infinite reverse; }
+        .animate-spin-slower { animation: spin 15s linear infinite; }
+        .animate-spin-slowest { animation: spin 20s linear infinite; }
         /* Hide scrollbar for clean mobile look */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -23,6 +31,51 @@
 <body class="bg-slate-50 text-slate-800 h-screen overflow-hidden select-none">
     <div id="app" class="flex flex-col h-full relative">
         
+        <!-- Splash Screen -->
+        <div v-if="showSplash" class="fixed inset-0 z-[300] bg-slate-900 flex flex-col items-center justify-center text-white animate-fade overflow-hidden">
+             <!-- Background Effects -->
+            <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+            <div class="absolute bottom-0 left-0 w-[300px] h-[300px] bg-indigo-500/20 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3"></div>
+
+            <!-- Orbit Visual -->
+            <div class="relative w-64 h-64 mb-12 flex items-center justify-center">
+                <!-- Core -->
+                <div class="absolute z-20 w-20 h-20 bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/60 shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+                    <i data-lucide="bar-chart-2" class="w-10 h-10 text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]"></i>
+                </div>
+                
+                <!-- Orbit 1 -->
+                <div class="absolute inset-16 border border-white/30 rounded-full animate-spin-slow">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#4f46e5] rounded-xl border border-white/60 shadow-[0_0_15px_rgba(79,70,229,0.5)] flex items-center justify-center animate-spin-reverse-slow">
+                        <i data-lucide="network" class="w-4 h-4 text-white"></i>
+                    </div>
+                </div>
+                
+                <!-- Orbit 2 -->
+                <div class="absolute inset-8 border border-dashed border-white/40 rounded-full animate-spin-reverse-slow" style="animation-duration: 15s;">
+                    <div class="absolute top-1/2 -right-4 -translate-y-1/2 w-8 h-8 bg-[#2563eb] rounded-xl border border-white/60 shadow-[0_0_15px_rgba(37,99,235,0.5)] flex items-center justify-center animate-spin-slow" style="animation-duration: 15s;"> 
+                        <i data-lucide="search" class="w-4 h-4 text-white"></i>
+                    </div>
+                </div>
+
+                <!-- Orbit 3 -->
+                <div class="absolute inset-0 border border-dotted border-white/30 rounded-full animate-spin-slow" style="animation-duration: 20s;">
+                    <div class="absolute bottom-4 left-4 w-auto bg-white/10 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-white/60 shadow-lg flex items-center gap-2 animate-spin-reverse-slow" style="animation-duration: 20s;">
+                        <i data-lucide="sparkles" class="w-3 h-3 text-yellow-300"></i>
+                        <span class="text-[10px] font-bold text-white whitespace-nowrap">智能洞察</span>
+                    </div>
+                </div>
+            </div>
+
+            <h1 class="text-3xl font-bold mb-3 tracking-tight">Trae Research</h1>
+            <p class="text-blue-200 text-sm font-light tracking-widest mb-16 opacity-80">深度洞察 · 决胜投资未来</p>
+            
+            <button @click="showSplash = false" class="px-10 py-3.5 bg-white text-blue-900 rounded-full font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-transform flex items-center gap-2">
+                立即进入
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+
         <!-- Top Status Bar (Mock) -->
         <div class="h-12 bg-white/80 backdrop-blur-md flex items-center justify-between px-4 border-b border-slate-100 z-10 shrink-0">
             <h1 class="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{{ viewTitle }}</h1>
@@ -176,7 +229,7 @@
                 <div class="p-4 bg-white border-b border-slate-100 sticky top-0 z-10">
                     <div class="relative">
                         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-                        <input type="text" placeholder="搜索公司/代码/行业" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                        <input v-model="searchQuery" type="text" placeholder="搜索公司名称或代码" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-colors">
                     </div>
                 </div>
                 <!-- Company List & QA -->
@@ -209,7 +262,7 @@
                         </div>
                     </div>
 
-                    <div v-for="company in companies" :key="company.code" @click="openCompanyDetail(company)" class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors flex items-center gap-4">
+                    <div v-for="company in filteredCompanies" :key="company.code" @click="openCompanyDetail(company)" class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors flex items-center gap-4">
                         <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
                             {{ company.name[0] }}
                         </div>
@@ -312,7 +365,7 @@
         <div v-if="showTemplateModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[160] flex items-end sm:items-center justify-center animate-fade">
             <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[80vh] flex flex-col animate-slide-up">
                 <div class="p-4 border-b border-slate-100 flex items-center gap-3">
-                    <button @click="showTemplateModal = false" class="p-2 -ml-2 text-slate-500 active:bg-slate-100 rounded-full"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                    <button @click="showTemplateModal = false" class="p-2 bg-slate-100 text-slate-600 rounded-full active:scale-95 transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
                     <h3 class="font-bold text-slate-800 text-lg">选择提纲模板</h3>
                 </div>
                 <div class="p-4 overflow-y-auto space-y-3">
@@ -331,7 +384,7 @@
         <div v-if="showHistoryModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[160] flex items-end sm:items-center justify-center animate-fade">
             <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl h-[85vh] flex flex-col animate-slide-up">
                 <div class="p-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
-                    <button @click="showHistoryModal = false" class="p-2 -ml-2 text-slate-500 active:bg-slate-100 rounded-full"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                    <button @click="showHistoryModal = false" class="p-2 bg-slate-100 text-slate-600 rounded-full active:scale-95 transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
                     <h3 class="font-bold text-slate-800 text-lg">引用参考资料</h3>
                 </div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-6">
@@ -379,7 +432,7 @@
         <div v-if="showReqSelectionModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[170] flex items-end sm:items-center justify-center animate-fade">
             <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[80vh] flex flex-col animate-slide-up">
                 <div class="p-4 border-b border-slate-100 flex items-center gap-3">
-                    <button @click="showReqSelectionModal = false" class="p-2 -ml-2 text-slate-500 active:bg-slate-100 rounded-full"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                    <button @click="showReqSelectionModal = false" class="p-2 bg-slate-100 text-slate-600 rounded-full active:scale-95 transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
                     <h3 class="font-bold text-slate-800 text-lg">选择关联需求</h3>
                 </div>
                 <div class="p-4 overflow-y-auto space-y-3">
@@ -402,7 +455,7 @@
             <!-- Header -->
             <div class="px-4 py-3 bg-white border-b border-slate-100 flex justify-between items-center shadow-sm z-10 pt-safe">
                 <div class="flex items-center gap-3">
-                    <button @click="showOutlineModal = false" class="p-2 -ml-2 text-slate-500 active:bg-slate-100 rounded-full"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                    <button @click="showOutlineModal = false" class="p-2 bg-slate-100 text-slate-600 rounded-full active:scale-95 transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
                     <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
                         <i data-lucide="sparkles" class="w-5 h-5 text-indigo-500"></i>
                         智能提纲
@@ -633,8 +686,13 @@
                     <div class="space-y-3">
                         <div v-for="record in companyHistory" :key="record.id" class="p-4 border border-slate-100 rounded-xl shadow-sm bg-white active:bg-slate-50 transition-colors">
                             <div class="flex justify-between items-start mb-2">
-                                <h4 class="font-bold text-sm text-slate-800 line-clamp-1">{{ record.title }}</h4>
-                                <span class="text-xs text-slate-400 shrink-0">{{ record.date }}</span>
+                                <h4 class="font-bold text-sm text-slate-800 line-clamp-1 flex-1 mr-2">{{ record.title }}</h4>
+                                <div class="flex items-center gap-3 shrink-0">
+                                    <span class="text-xs text-slate-400">{{ record.date }}</span>
+                                    <button @click.stop="shareRecord(record)" class="p-1.5 -mr-1.5 bg-blue-50 text-blue-600 rounded-lg active:scale-90 transition-transform">
+                                        <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[10px] font-medium">{{ record.type || '调研' }}</span>
@@ -683,6 +741,103 @@
             <div class="p-4 border-t border-slate-100">
                 <button class="w-full py-3 bg-blue-50 text-blue-600 font-bold rounded-xl" @click="showCompanyDetail = false; switchView('requirements'); reqFilter='全部'; newReqForm.company = selectedCompany.name; showNewReqModal = true;">
                     新建相关需求
+                </button>
+            </div>
+        </div>
+
+        <!-- Active Recording Overlay -->
+        <div v-if="isRecording" class="fixed inset-0 z-[100] bg-slate-900 flex flex-col animate-fade">
+            <!-- Header -->
+            <div class="h-14 flex items-center justify-between px-4 border-b border-white/10 shrink-0">
+                <div class="flex items-center gap-2 text-white">
+                    <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                    <span class="font-mono text-lg font-bold">{{ formatTime(recordingSeconds) }}</span>
+                </div>
+                <button @click="stopRecording" class="px-4 py-1.5 bg-red-500/20 text-red-400 rounded-full text-xs font-bold border border-red-500/30">
+                    结束录音
+                </button>
+            </div>
+
+            <!-- Main Content -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-6">
+                <!-- Waveform Visualization (Mock) -->
+                <div class="h-24 flex items-center justify-center gap-1">
+                    <div v-for="i in 20" :key="i" class="w-1 bg-blue-500 rounded-full animate-pulse" 
+                        :style="{ height: Math.random() * 100 + '%', animationDelay: i * 0.1 + 's' }"></div>
+                </div>
+
+                <!-- Current Topic Card -->
+                <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 relative overflow-hidden transition-all duration-500" :class="{'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20': recordingSeconds > 3}">
+                    <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                    <div class="flex items-center gap-2 mb-2 text-blue-400 text-xs font-bold uppercase tracking-wider">
+                        <i data-lucide="target" class="w-3 h-3"></i> 当前议题
+                    </div>
+                    <h3 class="text-white font-bold text-lg leading-snug mb-2">
+                         {{ recordingSeconds > 3 ? (currentOutline?.questions[0]?.content || '公司未来3-5年的核心战略规划是什么？') : '正在识别议题...' }}
+                    </h3>
+                    <p class="text-slate-400 text-sm" v-if="recordingSeconds > 3">
+                        检测到关键词：<span class="text-white bg-slate-700 px-1 rounded">战略规划</span> <span class="text-white bg-slate-700 px-1 rounded">海外布局</span>
+                    </p>
+                </div>
+
+                <!-- Real-time Verification Card -->
+                <transition name="slide-up">
+                    <div v-if="verifiedData" class="bg-slate-800 rounded-2xl p-5 border border-slate-700 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2 text-green-400 text-xs font-bold uppercase tracking-wider">
+                                <i data-lucide="check-circle" class="w-3 h-3"></i> 数据验证通过
+                            </div>
+                            <span class="text-slate-500 text-[10px]">刚刚</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div>
+                                <div class="text-slate-400 text-xs mb-1">提到数据</div>
+                                <div class="text-white font-bold text-xl">25%</div>
+                            </div>
+                            <i data-lucide="arrow-right" class="w-4 h-4 text-slate-600"></i>
+                            <div>
+                                <div class="text-slate-400 text-xs mb-1">财报核实</div>
+                                <div class="text-green-400 font-bold text-xl">25.3%</div>
+                            </div>
+                        </div>
+                        <p class="text-slate-400 text-xs mt-3 bg-slate-900/50 p-2 rounded-lg">
+                            来源：2024年年度报告 · 营收增长率
+                        </p>
+                    </div>
+                </transition>
+
+                <!-- Transcript Stream -->
+                <div class="space-y-3">
+                    <div v-for="(text, idx) in transcript" :key="idx" class="flex gap-3 animate-fade">
+                         <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white font-bold shrink-0">
+                            {{ idx % 2 === 0 ? 'Q' : 'A' }}
+                        </div>
+                        <div class="flex-1 bg-slate-800 rounded-xl rounded-tl-none p-3 text-slate-300 text-sm leading-relaxed">
+                            {{ text }}
+                        </div>
+                    </div>
+                     <div class="flex gap-3">
+                         <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs text-white font-bold shrink-0 animate-pulse">
+                            A
+                        </div>
+                        <div class="flex-1 bg-slate-800 rounded-xl rounded-tl-none p-3 text-slate-400 text-sm leading-relaxed italic">
+                            正在转写...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="p-6 bg-slate-800 border-t border-white/10 flex justify-center gap-8 shrink-0">
+                <button class="p-4 rounded-full bg-slate-700 text-white hover:bg-slate-600 transition-colors">
+                    <i data-lucide="flag" class="w-6 h-6"></i>
+                </button>
+                <button @click="togglePause" class="p-4 rounded-full bg-white text-slate-900 hover:bg-slate-200 transition-colors scale-110 shadow-lg shadow-white/10">
+                    <i :data-lucide="isPaused ? 'play' : 'pause'" class="w-6 h-6 fill-current"></i>
+                </button>
+                 <button class="p-4 rounded-full bg-slate-700 text-white hover:bg-slate-600 transition-colors">
+                    <i data-lucide="keyboard" class="w-6 h-6"></i>
                 </button>
             </div>
         </div>
@@ -754,10 +909,11 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+        const { createApp, ref, computed, onMounted, onUpdated, nextTick } = Vue;
 
         createApp({
             setup() {
+                const showSplash = ref(true);
                 const currentView = ref('dashboard');
                 const viewTitle = computed(() => {
                     const map = {
@@ -779,6 +935,7 @@
                 const showShareModal = ref(false);
                 const shareData = ref({});
                 const reqFilter = ref('全部');
+                const searchQuery = ref('');
                 
                 const showOutlineModal = ref(false);
                 const isGeneratingOutline = ref(false);
@@ -786,6 +943,8 @@
                 const generatedOutline = ref([]);
                 const outlineTitle = ref('');
                 const currentOutline = ref(null);
+                const verifiedData = ref(null);
+                const transcript = ref([]);
 
                 const showNewReqModal = ref(false);
                 const newReqForm = ref({ title: '', company: '', priority: 'Medium', status: '待处理' });
@@ -814,11 +973,19 @@
                         isGeneratingOutline.value = true;
                         setTimeout(() => {
                             isGeneratingOutline.value = false;
-                            generatedOutline.value = [
-                                { category: '综合', content: '（AI生成）公司目前的主要营收来源是什么？' },
-                                { category: '战略', content: '（AI生成）未来3年的增长预期如何？' },
-                                { category: '竞争', content: '（AI生成）核心竞争优势有哪些？' }
-                            ];
+                            if (selectedReq.value) {
+                                generatedOutline.value = [
+                                    { category: '海外布局', content: '请问公司在' + selectedReq.value.company + '海外市场的具体布局与渠道建设进展如何？' },
+                                    { category: '成本控制', content: '面对原材料价格波动，公司采取了哪些具体的成本控制与对冲策略？' },
+                                    { category: '竞争格局', content: '对于未来3-5年的行业竞争格局，管理层如何预判？公司的核心壁垒在哪里？' }
+                                ];
+                            } else {
+                                generatedOutline.value = [
+                                    { category: '综合', content: '（AI生成）公司目前的主要营收来源是什么？' },
+                                    { category: '战略', content: '（AI生成）未来3年的增长预期如何？' },
+                                    { category: '竞争', content: '（AI生成）核心竞争优势有哪些？' }
+                                ];
+                            }
                         }, 1500);
                     } else if (type === 'template') {
                         showTemplateModal.value = true;
@@ -948,6 +1115,15 @@
                     { name: '迈瑞医疗', code: '300760', industry: '医疗器械', pe: '30.2' },
                 ]);
 
+                const filteredCompanies = computed(() => {
+                    if (!searchQuery.value) return companies.value;
+                    const query = searchQuery.value.toLowerCase();
+                    return companies.value.filter(c => 
+                        c.name.toLowerCase().includes(query) || 
+                        c.code.includes(query)
+                    );
+                });
+
                 const companyHistory = ref([
                     { id: 1, title: '比亚迪2025Q1业绩交流', date: '2025-04-15', researcher: '我', summary: '业绩超预期，海外市场毛利率显著提升，高端车型占比持续扩大。' },
                     { id: 2, title: '宁德时代新技术发布会', date: '2025-03-20', researcher: '我', summary: '发布凝聚态电池，能量密度突破500Wh/kg，预计年内量产。' }
@@ -1056,7 +1232,6 @@
                     });
                     showNewReqModal.value = false;
                     newReqForm.value = { title: '', company: '', priority: 'Medium', status: '待处理' };
-                    reqFilter.value = '全部'; // Reset filter to show new item
                 };
                 
                 const openReqDetail = (req) => {
@@ -1081,18 +1256,7 @@
 
                 const startOutlineFromReq = (req) => {
                     selectedReq.value = req;
-                    showOutlineModal.value = true;
-                    isGeneratingOutline.value = true;
-                    // Simulate AI generation
-                    setTimeout(() => {
-                        isGeneratingOutline.value = false;
-                        generatedOutline.value = [
-                            '请问公司在' + req.company + '海外市场的具体布局与渠道建设进展如何？',
-                            '面对原材料价格波动，公司采取了哪些具体的成本控制与对冲策略？',
-                            '对于未来3-5年的行业竞争格局，管理层如何预判？公司的核心壁垒在哪里？'
-                        ];
-                        nextTick(() => lucide.createIcons());
-                    }, 2000);
+                    switchView('outcomes');
                 };
 
                 const useOutline = () => {
@@ -1256,7 +1420,12 @@
                     lucide.createIcons();
                 });
 
+                onUpdated(() => {
+                    lucide.createIcons();
+                });
+
                 return {
+                    showSplash,
                     currentView,
                     viewTitle,
                     requirements,
@@ -1318,7 +1487,11 @@
                     qaInput,
                     qaMessages,
                     isQaLoading,
-                    askAI
+                    askAI,
+                    searchQuery,
+                    filteredCompanies,
+                    verifiedData,
+                    transcript
                 };
             }
         }).mount('#app');
