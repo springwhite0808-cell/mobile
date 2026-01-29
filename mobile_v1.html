@@ -343,7 +343,7 @@
         </main>
 
         <!-- Bottom Navigation -->
-        <nav class="bg-white border-t border-slate-200 h-16 fixed bottom-0 w-full flex justify-around items-center px-2 pb-safe z-50">
+        <nav v-if="currentView !== 'cover'" class="bg-white border-t border-slate-200 h-16 fixed bottom-0 w-full flex justify-around items-center px-2 pb-safe z-50">
             <button @click="switchView('dashboard')" :class="['flex flex-col items-center gap-1 w-14 transition-colors', currentView === 'dashboard' ? 'text-blue-600' : 'text-slate-400']">
                 <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
                 <span class="text-[10px] font-medium">工作台</span>
